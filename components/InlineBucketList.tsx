@@ -213,7 +213,7 @@ export default function InlineBucketList({ wishlist, onSave, onStartPlanning, on
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
         {wishlist.map((d) => (
           <DestinationCard
             key={d.id}

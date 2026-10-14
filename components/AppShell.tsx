@@ -1,18 +1,32 @@
 "use client";
 import Sidebar from "./Sidebar";
+import BottomNav from "./BottomNav";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen" style={{ background: "var(--cream)" }}>
-      <Sidebar />
+      {/* Sidebar — desktop only */}
+      <div className="hidden md:block">
+        <Sidebar />
+      </div>
+
+      {/* Main content */}
       <main
-        className="flex-1 min-h-screen"
-        style={{ marginLeft: "240px", padding: "48px 56px" }}
+        className="flex-1 min-h-screen px-4 py-6 md:px-14 md:py-12"
+        style={{ marginLeft: "0" }}
       >
-        <div style={{ maxWidth: "720px" }}>
-          {children}
+        {/* Desktop offset for sidebar */}
+        <div className="md:ml-[240px]">
+          <div style={{ maxWidth: "720px" }} className="pb-24 md:pb-8">
+            {children}
+          </div>
         </div>
       </main>
+
+      {/* Bottom nav — mobile only */}
+      <div className="block md:hidden">
+        <BottomNav />
+      </div>
     </div>
   );
 }

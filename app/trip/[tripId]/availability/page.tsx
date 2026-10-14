@@ -316,10 +316,10 @@ export default function AvailabilityPage() {
 
       {/* Sticky save */}
       <div
-        className="fixed bottom-0 left-0 right-0 px-6 py-4"
+        className="fixed bottom-0 left-0 right-0 px-4 py-4 md:px-6"
         style={{ background: "var(--cream)", borderTop: "1px solid var(--border)" }}
       >
-        <div style={{ maxWidth: "720px", marginLeft: "240px" }}>
+        <div className="md:ml-[240px]" style={{ maxWidth: "720px" }}>
           <button
             onClick={handleSave}
             disabled={selectedDates.size === 0 || saving}
