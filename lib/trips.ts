@@ -8,13 +8,18 @@ import {
   updateDoc,
   query,
   where,
-  arrayUnion,
-  arrayRemove,
-  Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
-import { Trip, Member, Availability, Decision, DecisionOption } from "@/types";
+import { Trip, Member, Decision, DecisionOption } from "@/types";
 import { nanoid } from "nanoid";
+
+// Trip-specific availability (separate from user profile Availability)
+export interface TripAvailability {
+  uid: string;
+  dateRanges: { start: string; end: string }[];
+  vibes: string[];
+  budgetRange: { min: number; max: number };
+}
 
 // ── Trips ──────────────────────────────────────────────────────────────────
 
@@ -33,6 +38,7 @@ export async function createTrip(
     status: "planning",
     inviteCode,
     createdAt: Date.now(),
+    participantUids: [organizerId],
   };
   await setDoc(doc(db, "trips", tripId), trip);
   // Add organizer as first member
@@ -72,12 +78,16 @@ export async function joinTrip(
   displayName: string,
   photoURL: string
 ) {
+  const { arrayUnion } = await import("firebase/firestore");
   await setDoc(doc(db, "trips", tripId, "members", uid), {
     uid,
     displayName,
     photoURL,
     joinedAt: Date.now(),
     hasSubmittedPrefs: false,
+  });
+  await updateDoc(doc(db, "trips", tripId), {
+    participantUids: arrayUnion(uid),
   });
 }
 
@@ -89,7 +99,7 @@ export function subscribeToMembers(tripId: string, cb: (members: Member[]) => vo
 
 // ── Availability ───────────────────────────────────────────────────────────
 
-export async function submitAvailability(tripId: string, avail: Availability) {
+export async function submitAvailability(tripId: string, avail: TripAvailability) {
   await setDoc(doc(db, "trips", tripId, "availability", avail.uid), avail);
   await updateDoc(doc(db, "trips", tripId, "members", avail.uid), {
     hasSubmittedPrefs: true,
@@ -98,10 +108,10 @@ export async function submitAvailability(tripId: string, avail: Availability) {
 
 export function subscribeToAvailability(
   tripId: string,
-  cb: (avails: Availability[]) => void
+  cb: (avails: TripAvailability[]) => void
 ) {
   return onSnapshot(collection(db, "trips", tripId, "availability"), (snap) => {
-    cb(snap.docs.map((d) => d.data() as Availability));
+    cb(snap.docs.map((d) => d.data() as TripAvailability));
   });
 }
 
@@ -152,6 +162,19 @@ export async function finalizeOption(
     isFinalized: o.id === optionId,
   }));
   await updateDoc(ref, { options, finalizedOptionId: optionId });
+}
+
+export function subscribeToUserTrips(uid: string, cb: (trips: Trip[]) => void) {
+  return onSnapshot(
+    query(collection(db, "trips"), where("participantUids", "array-contains", uid)),
+    (snap) => {
+      const trips = snap.docs
+        .map((d) => d.data() as Trip)
+        .filter((t) => t.status !== "done" && t.status !== "completed")
+        .sort((a, b) => b.createdAt - a.createdAt);
+      cb(trips);
+    }
+  );
 }
 
 export function subscribeToDecisions(

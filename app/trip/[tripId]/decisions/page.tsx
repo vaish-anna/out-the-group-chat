@@ -10,85 +10,79 @@ import {
   finalizeOption,
 } from "@/lib/trips";
 import { Decision, DecisionOption, Trip } from "@/types";
+import AppShell from "@/components/AppShell";
 import Link from "next/link";
 import { nanoid } from "nanoid";
 
 const CATEGORIES: Decision["category"][] = [
-  "destination",
-  "dates",
-  "transport",
-  "accommodation",
-  "activity",
+  "destination", "dates", "transport", "accommodation", "activity",
 ];
 
-const CATEGORY_EMOJI: Record<Decision["category"], string> = {
-  destination: "🌍",
-  dates: "📅",
-  transport: "✈️",
-  accommodation: "🏨",
-  activity: "🎯",
-};
-
 function VoteBar({ option, uid, decisionId, tripId, isOrganizer, decisionFinalized }: {
-  option: DecisionOption;
-  uid: string;
-  decisionId: string;
-  tripId: string;
-  isOrganizer: boolean;
-  decisionFinalized: boolean;
+  option: DecisionOption; uid: string; decisionId: string;
+  tripId: string; isOrganizer: boolean; decisionFinalized: boolean;
 }) {
-  const myVote = option.thumbsUp.includes(uid)
-    ? "up"
-    : option.thumbsDown.includes(uid)
-    ? "down"
-    : null;
+  const myVote = option.thumbsUp.includes(uid) ? "up" : option.thumbsDown.includes(uid) ? "down" : null;
 
   async function handleVote(v: "up" | "down") {
     if (decisionFinalized) return;
-    if (myVote === v) {
-      await voteOnOption(tripId, decisionId, option, uid, "remove");
-    } else {
-      await voteOnOption(tripId, decisionId, option, uid, v);
-    }
+    await voteOnOption(tripId, decisionId, option, uid, myVote === v ? "remove" : v);
   }
 
   return (
     <div
-      className={`flex items-center gap-3 rounded-xl px-3 py-3 border transition-all ${
-        option.isFinalized
-          ? "bg-emerald-50 border-emerald-300"
-          : "bg-gray-50 border-gray-100"
-      }`}
+      className="flex items-center gap-3 rounded-xl px-4 py-3 transition-all"
+      style={{
+        background: option.isFinalized ? "var(--olive-dark)" : "var(--surface-2)",
+        border: `1px solid ${option.isFinalized ? "var(--olive-dark)" : "var(--border)"}`,
+      }}
     >
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-semibold truncate ${option.isFinalized ? "text-emerald-800" : "text-gray-800"}`}>
-          {option.isFinalized && "✓ "}{option.label}
+        <p className="text-sm font-semibold truncate" style={{ color: option.isFinalized ? "white" : "var(--chocolate)" }}>
+          {option.isFinalized ? "Decided: " : ""}{option.label}
         </p>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-xs text-emerald-600">👍 {option.thumbsUp.length}</span>
-          <span className="text-xs text-red-400">👎 {option.thumbsDown.length}</span>
+        <div className="flex items-center gap-3 mt-0.5">
+          <span className="text-xs font-semibold" style={{ color: option.isFinalized ? "rgba(255,255,255,0.65)" : "var(--olive-dark)" }}>
+            {option.thumbsUp.length} up
+          </span>
+          <span className="text-xs font-semibold" style={{ color: option.isFinalized ? "rgba(255,255,255,0.45)" : "var(--warm-brown)", opacity: 0.65 }}>
+            {option.thumbsDown.length} down
+          </span>
         </div>
       </div>
+
       {!decisionFinalized && (
         <div className="flex gap-2">
           <button
             onClick={() => handleVote("up")}
-            className={`text-lg transition-transform active:scale-90 ${myVote === "up" ? "opacity-100" : "opacity-40 hover:opacity-80"}`}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-90"
+            style={{
+              background: myVote === "up" ? "var(--olive-dark)" : "var(--surface)",
+              color: myVote === "up" ? "white" : "var(--chocolate)",
+              border: "1px solid var(--border)",
+            }}
           >
-            👍
+            Yes
           </button>
           <button
             onClick={() => handleVote("down")}
-            className={`text-lg transition-transform active:scale-90 ${myVote === "down" ? "opacity-100" : "opacity-40 hover:opacity-80"}`}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-90"
+            style={{
+              background: myVote === "down" ? "var(--burgundy)" : "var(--surface)",
+              color: myVote === "down" ? "white" : "var(--chocolate)",
+              border: "1px solid var(--border)",
+            }}
           >
-            👎
+            No
           </button>
         </div>
       )}
+
       {isOrganizer && !decisionFinalized && (
         <button
           onClick={() => finalizeOption(tripId, decisionId, option.id)}
-          className="text-xs font-bold text-violet-600 bg-violet-50 px-2 py-1 rounded-lg ml-1"
+          className="text-xs font-bold px-3 py-1.5 rounded-lg transition-all active:scale-95"
+          style={{ background: "var(--terracotta)", color: "white" }}
         >
           Pick
         </button>
@@ -97,16 +91,8 @@ function VoteBar({ option, uid, decisionId, tripId, isOrganizer, decisionFinaliz
   );
 }
 
-function DecisionCard({
-  decision,
-  uid,
-  tripId,
-  isOrganizer,
-}: {
-  decision: Decision;
-  uid: string;
-  tripId: string;
-  isOrganizer: boolean;
+function DecisionCard({ decision, uid, tripId, isOrganizer }: {
+  decision: Decision; uid: string; tripId: string; isOrganizer: boolean;
 }) {
   const [newOption, setNewOption] = useState("");
   const [adding, setAdding] = useState(false);
@@ -128,23 +114,25 @@ function DecisionCard({
     if (snap.exists()) {
       await updateDoc(ref, { options: [...(snap.data().options ?? []), option] });
     }
-    setNewOption("");
-    setAdding(false);
+    setNewOption(""); setAdding(false);
   }
 
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{CATEGORY_EMOJI[decision.category]}</span>
-          <div>
-            <p className="font-bold text-gray-900 text-sm">{decision.title}</p>
-            <p className="text-xs text-gray-400 capitalize">{decision.category}</p>
-          </div>
+    <div
+      className="rounded-2xl px-5 py-5"
+      style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="font-bold text-base" style={{ color: "var(--chocolate)" }}>{decision.title}</p>
+          <p className="text-xs capitalize mt-0.5" style={{ color: "var(--warm-brown)", opacity: 0.55 }}>{decision.category}</p>
         </div>
         {isFinalized && (
-          <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
-            Decided ✓
+          <span
+            className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide"
+            style={{ background: "var(--olive-light)", color: "var(--olive-dark)" }}
+          >
+            Decided
           </span>
         )}
       </div>
@@ -169,24 +157,22 @@ function DecisionCard({
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Add option…"
+                placeholder="Add an option..."
                 value={newOption}
                 onChange={(e) => setNewOption(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addOption()}
                 autoFocus
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-violet-400"
+                className="flex-1 px-3 py-2 rounded-xl text-sm outline-none border-2 transition-colors"
+                style={{ background: "var(--surface-2)", borderColor: newOption ? "var(--terracotta)" : "var(--border)", color: "var(--chocolate)" }}
               />
-              <button onClick={addOption} className="text-sm font-bold text-violet-600">
-                Add
-              </button>
-              <button onClick={() => setAdding(false)} className="text-sm text-gray-400">
-                Cancel
-              </button>
+              <button onClick={addOption} className="text-sm font-bold" style={{ color: "var(--terracotta)" }}>Add</button>
+              <button onClick={() => setAdding(false)} className="text-sm" style={{ color: "var(--warm-brown)", opacity: 0.5 }}>Cancel</button>
             </div>
           ) : (
             <button
               onClick={() => setAdding(true)}
-              className="text-xs text-violet-500 font-semibold hover:text-violet-700"
+              className="text-xs font-semibold"
+              style={{ color: "var(--terracotta)" }}
             >
               + Add option
             </button>
@@ -216,85 +202,80 @@ export default function DecisionsPage() {
   }, [tripId]);
 
   useEffect(() => {
-    if (!loading && !user) router.push("/");
+    if (!loading && !user) router.replace("/login");
   }, [user, loading, router]);
 
   async function handleCreate() {
     if (!newTitle.trim() || !tripId) return;
     setCreating(true);
-    await createDecision(tripId, {
-      category: newCategory,
-      title: newTitle.trim(),
-      options: [],
-    });
-    setNewTitle("");
-    setShowNew(false);
-    setCreating(false);
+    await createDecision(tripId, { category: newCategory, title: newTitle.trim(), options: [] });
+    setNewTitle(""); setShowNew(false); setCreating(false);
   }
 
   const isOrganizer = user?.uid === trip?.organizerId;
 
   if (loading || !trip) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-4 border-violet-500 border-t-transparent animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--cream)" }}>
+        <div className="w-8 h-8 rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: "var(--terracotta)", borderTopColor: "transparent" }} />
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen px-5 py-8 max-w-md mx-auto flex flex-col gap-5 pb-24">
-      <div className="flex items-center gap-3">
-        <Link href={`/trip/${tripId}`} className="text-gray-400 hover:text-gray-600 text-xl">
-          ←
+    <AppShell>
+      <div className="flex items-center gap-3 mb-8">
+        <Link href={`/trip/${tripId}`} className="text-sm font-semibold" style={{ color: "var(--terracotta)" }}>
+          Back
         </Link>
+        <span style={{ color: "var(--border)" }}>/</span>
         <div>
-          <h1 className="text-xl font-black text-gray-900">Decision board</h1>
-          <p className="text-xs text-gray-400">{trip.name}</p>
+          <h1 className="text-3xl font-black" style={{ color: "var(--chocolate)" }}>Decision board</h1>
+          <p className="text-xs mt-0.5" style={{ color: "var(--warm-brown)", opacity: 0.55 }}>{trip.name}</p>
         </div>
       </div>
 
       {decisions.length === 0 && !showNew && (
-        <div className="text-center py-12 text-gray-400">
-          <div className="text-4xl mb-3">🤔</div>
+        <div className="py-12 text-center" style={{ color: "var(--warm-brown)", opacity: 0.4 }}>
           <p className="text-sm font-medium">No decisions yet.</p>
           <p className="text-xs mt-1">Add one to start voting with your crew.</p>
         </div>
       )}
 
-      {decisions.map((d) => (
-        <DecisionCard
-          key={d.id}
-          decision={d}
-          uid={user!.uid}
-          tripId={tripId}
-          isOrganizer={isOrganizer}
-        />
-      ))}
+      <div className="flex flex-col gap-4">
+        {decisions.map((d) => (
+          <DecisionCard key={d.id} decision={d} uid={user!.uid} tripId={tripId} isOrganizer={isOrganizer} />
+        ))}
+      </div>
 
       {showNew ? (
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-violet-200 flex flex-col gap-3">
-          <h2 className="font-bold text-gray-800 text-sm">New decision</h2>
+        <div
+          className="rounded-2xl px-5 py-5 mt-4 flex flex-col gap-3"
+          style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+        >
+          <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--olive-dark)" }}>New decision</p>
           <input
             type="text"
             placeholder="e.g. Where should we stay?"
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             autoFocus
-            className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-violet-400"
+            className="px-4 py-3 rounded-xl text-sm outline-none border-2 transition-colors"
+            style={{ background: "var(--surface-2)", borderColor: newTitle ? "var(--terracotta)" : "var(--border)", color: "var(--chocolate)" }}
           />
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setNewCategory(cat)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                  newCategory === cat
-                    ? "bg-violet-600 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
+                className="px-3 py-1.5 rounded-full text-xs font-semibold capitalize transition-all"
+                style={{
+                  background: newCategory === cat ? "var(--olive-dark)" : "var(--surface-2)",
+                  color: newCategory === cat ? "white" : "var(--chocolate)",
+                  border: `1px solid ${newCategory === cat ? "var(--olive-dark)" : "var(--border)"}`,
+                }}
               >
-                {CATEGORY_EMOJI[cat]} {cat}
+                {cat}
               </button>
             ))}
           </div>
@@ -302,14 +283,12 @@ export default function DecisionsPage() {
             <button
               onClick={handleCreate}
               disabled={!newTitle.trim() || creating}
-              className="flex-1 bg-violet-600 disabled:opacity-40 text-white font-bold py-2.5 rounded-xl text-sm"
+              className="flex-1 py-3 rounded-xl font-bold text-sm disabled:opacity-40 transition-all"
+              style={{ background: "var(--terracotta)", color: "white" }}
             >
-              {creating ? "Creating…" : "Create"}
+              {creating ? "Creating..." : "Create"}
             </button>
-            <button
-              onClick={() => setShowNew(false)}
-              className="px-4 py-2.5 text-sm text-gray-400 hover:text-gray-600"
-            >
+            <button onClick={() => setShowNew(false)} className="px-4 text-sm font-semibold" style={{ color: "var(--warm-brown)" }}>
               Cancel
             </button>
           </div>
@@ -317,11 +296,12 @@ export default function DecisionsPage() {
       ) : (
         <button
           onClick={() => setShowNew(true)}
-          className="w-full border-2 border-dashed border-gray-200 hover:border-violet-300 text-gray-400 hover:text-violet-500 font-semibold py-4 rounded-2xl text-sm transition-all"
+          className="w-full mt-4 py-4 rounded-2xl text-sm font-semibold transition-all"
+          style={{ background: "var(--surface-2)", color: "var(--warm-brown)", border: "2px dashed var(--border)" }}
         >
           + Add a decision
         </button>
       )}
-    </main>
+    </AppShell>
   );
 }

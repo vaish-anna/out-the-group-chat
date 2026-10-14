@@ -27,19 +27,19 @@ export default function Avatar({
     );
   }
 
-  const colors = [
-    "bg-violet-400",
-    "bg-pink-400",
-    "bg-amber-400",
-    "bg-emerald-400",
-    "bg-sky-400",
+  const palettes = [
+    { bg: "var(--terracotta)", fg: "white" },
+    { bg: "var(--olive-dark)", fg: "white" },
+    { bg: "var(--warm-brown)", fg: "white" },
+    { bg: "var(--slate)", fg: "white" },
+    { bg: "var(--chocolate)", fg: "white" },
   ];
-  const color = colors[name.charCodeAt(0) % colors.length];
+  const palette = palettes[name.charCodeAt(0) % palettes.length];
 
   return (
     <div
-      className={`${color} rounded-full flex items-center justify-center text-white font-bold`}
-      style={{ width: size, height: size, fontSize: size * 0.38 }}
+      className="rounded-full flex items-center justify-center font-bold"
+      style={{ width: size, height: size, fontSize: size * 0.38, background: palette.bg, color: palette.fg }}
     >
       {initials}
     </div>

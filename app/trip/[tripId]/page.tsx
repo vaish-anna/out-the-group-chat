@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { subscribeToTrip, subscribeToMembers } from "@/lib/trips";
 import { Trip, Member } from "@/types";
 import Avatar from "@/components/Avatar";
+import AppShell from "@/components/AppShell";
 import Link from "next/link";
 
 export default function TripPage() {
@@ -16,86 +17,100 @@ export default function TripPage() {
 
   useEffect(() => {
     if (!tripId) return;
-    const unsub1 = subscribeToTrip(tripId, setTrip);
-    const unsub2 = subscribeToMembers(tripId, setMembers);
-    return () => { unsub1(); unsub2(); };
+    const u1 = subscribeToTrip(tripId, setTrip);
+    const u2 = subscribeToMembers(tripId, setMembers);
+    return () => { u1(); u2(); };
   }, [tripId]);
 
   useEffect(() => {
-    if (!loading && !user) router.push("/");
+    if (!loading && !user) router.replace("/login");
   }, [user, loading, router]);
 
   if (loading || !trip) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-4 border-violet-500 border-t-transparent animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--cream)" }}>
+        <div className="w-8 h-8 rounded-full border-4 border-t-transparent animate-spin" style={{ borderColor: "var(--terracotta)", borderTopColor: "transparent" }} />
       </div>
     );
   }
 
   const submitted = members.filter((m) => m.hasSubmittedPrefs).length;
   const inviteUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/join/${trip.inviteCode}`;
-  const isOrganizer = user?.uid === trip.organizerId;
+  const myMember = members.find((m) => m.uid === user?.uid);
 
   return (
-    <main className="min-h-screen px-5 py-8 max-w-md mx-auto flex flex-col gap-6">
+    <AppShell>
       {/* Header */}
-      <div>
-        <p className="text-xs font-semibold text-violet-500 uppercase tracking-widest mb-1">
+      <div className="mb-8">
+        <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: "var(--terracotta)" }}>
           Trip
         </p>
-        <h1 className="text-2xl font-black text-gray-900">{trip.name}</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-3xl font-black" style={{ color: "var(--chocolate)" }}>{trip.name}</h1>
+        <p className="text-sm mt-1" style={{ color: "var(--warm-brown)", opacity: 0.6 }}>
           Organized by {trip.organizerName}
+          {trip.destination ? ` · ${trip.destination.name}, ${trip.destination.country}` : ""}
         </p>
       </div>
 
-      {/* Progress bar */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-sm font-semibold text-gray-700">Availability in</span>
-          <span className="text-sm font-bold text-violet-600">
-            {submitted}/{members.length}
+      {/* Availability progress */}
+      <div
+        className="rounded-2xl px-5 py-5 mb-4"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+      >
+        <div className="flex justify-between items-center mb-3">
+          <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--olive-dark)" }}>
+            Availability in
+          </p>
+          <span className="text-sm font-black" style={{ color: "var(--chocolate)" }}>
+            {submitted} / {members.length}
           </span>
         </div>
-        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+        <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--surface-2)" }}>
           <div
-            className="h-full bg-violet-500 rounded-full transition-all"
-            style={{ width: members.length ? `${(submitted / members.length) * 100}%` : "0%" }}
+            className="h-full rounded-full transition-all"
+            style={{
+              width: members.length ? `${(submitted / members.length) * 100}%` : "0%",
+              background: submitted === members.length ? "var(--olive-dark)" : "var(--terracotta)",
+            }}
           />
         </div>
         {submitted < members.length && (
-          <p className="text-xs text-gray-400 mt-2">
+          <p className="text-xs mt-2" style={{ color: "var(--warm-brown)", opacity: 0.5 }}>
             Waiting on {members.length - submitted} more {members.length - submitted === 1 ? "person" : "people"}
           </p>
         )}
       </div>
 
       {/* Members */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-        <h2 className="text-sm font-bold text-gray-700 mb-3">
-          Who&apos;s in ({members.length})
-        </h2>
+      <div
+        className="rounded-2xl px-5 py-5 mb-6"
+        style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+      >
+        <p className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: "var(--olive-dark)" }}>
+          Who's in ({members.length})
+        </p>
         <div className="flex flex-col gap-3">
           {members.map((m) => (
             <div key={m.uid} className="flex items-center gap-3">
               <Avatar name={m.displayName} photoURL={m.photoURL} size={36} />
               <div className="flex-1">
-                <p className="text-sm font-semibold text-gray-800">
+                <p className="text-sm font-semibold" style={{ color: "var(--chocolate)" }}>
                   {m.displayName}
                   {m.uid === trip.organizerId && (
-                    <span className="ml-1 text-xs text-violet-500">organizer</span>
+                    <span className="ml-2 text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--terracotta)" }}>
+                      organizer
+                    </span>
                   )}
                 </p>
               </div>
               <span
-                className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                  m.hasSubmittedPrefs
-                    ? "bg-emerald-50 text-emerald-600"
-                    : "bg-gray-100 text-gray-400"
-                }`}
+                className="text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide"
+                style={{
+                  background: m.hasSubmittedPrefs ? "var(--olive-light)" : "var(--surface-2)",
+                  color: m.hasSubmittedPrefs ? "var(--olive-dark)" : "var(--warm-brown)",
+                }}
               >
-                {m.hasSubmittedPrefs ? "✓ in" : "pending"}
+                {m.hasSubmittedPrefs ? "In" : "Pending"}
               </span>
             </div>
           ))}
@@ -106,34 +121,40 @@ export default function TripPage() {
       <div className="flex flex-col gap-3">
         <Link
           href={`/trip/${tripId}/availability`}
-          className="w-full bg-violet-600 hover:bg-violet-700 text-white font-bold py-4 rounded-2xl text-base text-center shadow-md active:scale-95 transition-all"
+          className="w-full font-bold py-4 rounded-2xl text-base text-center transition-all active:scale-95"
+          style={{ background: "var(--terracotta)", color: "white" }}
         >
-          {members.find((m) => m.uid === user?.uid)?.hasSubmittedPrefs
-            ? "✓ Update my availability"
-            : "Add my availability →"}
+          {myMember?.hasSubmittedPrefs ? "Update my availability" : "Add my availability"}
         </Link>
 
         <Link
           href={`/trip/${tripId}/decisions`}
-          className="w-full bg-white border-2 border-violet-200 hover:border-violet-400 text-violet-700 font-bold py-4 rounded-2xl text-base text-center active:scale-95 transition-all"
+          className="w-full font-bold py-4 rounded-2xl text-base text-center transition-all active:scale-95"
+          style={{ background: "var(--surface)", color: "var(--chocolate)", border: "1px solid var(--border)" }}
         >
           Decision board
         </Link>
 
-        {/* Invite link */}
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
-          <p className="text-xs font-semibold text-amber-700 mb-1">Invite link</p>
-          <div className="flex items-center gap-2">
-            <p className="text-xs text-amber-800 truncate flex-1">{inviteUrl}</p>
+        {/* Invite */}
+        <div
+          className="rounded-2xl px-4 py-4"
+          style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}
+        >
+          <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "var(--warm-brown)", opacity: 0.6 }}>
+            Invite link
+          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-xs truncate flex-1" style={{ color: "var(--chocolate)" }}>{inviteUrl}</p>
             <button
               onClick={() => navigator.clipboard.writeText(inviteUrl)}
-              className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded-lg shrink-0"
+              className="text-xs font-bold px-3 py-1.5 rounded-lg shrink-0 transition-all active:scale-95"
+              style={{ background: "var(--terracotta)", color: "white" }}
             >
               Copy
             </button>
           </div>
         </div>
       </div>
-    </main>
+    </AppShell>
   );
 }
