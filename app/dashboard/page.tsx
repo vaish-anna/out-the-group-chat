@@ -212,7 +212,18 @@ export default function Dashboard() {
             Your bucket list
           </h2>
         </div>
-        <InlineBucketList wishlist={profile.wishlist} onSave={handleSaveWishlist} />
+        <InlineBucketList
+          wishlist={profile.wishlist}
+          onSave={handleSaveWishlist}
+          onStartPlanning={(d) => {
+            setNewTripName(d.name + " trip");
+            setShowNewTripModal(true);
+          }}
+          onAddAvailability={() => {
+            setEditingAvailability(true);
+            document.querySelector("[data-tour='availability']")?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }}
+        />
       </section>
 
       {/* Availability */}

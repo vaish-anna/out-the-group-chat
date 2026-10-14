@@ -1,49 +1,82 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 
-export interface TourStep {
-  target: string; // CSS selector
-  title: string;
-  body: string;
-  position?: "top" | "bottom" | "left" | "right";
-}
-
-const STEPS: TourStep[] = [
+const STEPS = [
   {
     target: "[data-tour='timeline']",
     title: "Your travel timeline",
-    body: "Add upcoming trips here to see them on a visual timeline. Your crew can see when you're away.",
-    position: "bottom",
+    body: "Add upcoming trips to see them on a visual timeline. Your crew can see when you're away.",
+    position: "bottom" as const,
   },
   {
     target: "[data-tour='bucket-list']",
     title: "Bucket list",
     body: "Add destinations you want to visit. We'll match you with friends who want to go to the same places.",
-    position: "bottom",
+    position: "bottom" as const,
   },
   {
     target: "[data-tour='availability']",
     title: "Your availability",
     body: "Tell us when you're free — by season or month. This is how we find overlaps with your friends.",
-    position: "top",
+    position: "bottom" as const,
   },
   {
     target: "[data-tour='trips']",
     title: "Active trips",
     body: "Start a new trip or continue planning one. Invite your crew and vote on the details together.",
-    position: "top",
+    position: "bottom" as const,
   },
   {
     target: "[data-tour='friends']",
     title: "Friends",
     body: "Follow friends to see their bucket lists and availability. When plans align, you'll get a notification.",
-    position: "top",
+    position: "top" as const,
   },
 ];
 
-function getRect(selector: string): DOMRect | null {
-  const el = document.querySelector(selector);
-  return el ? el.getBoundingClientRect() : null;
+type Rect = { top: number; left: number; width: number; height: number };
+
+function useElementRect(selector: string, step: number) {
+  const [rect, setRect] = useState<Rect | null>(null);
+
+  useEffect(() => {
+    function measure() {
+      const el = document.querySelector(selector);
+      if (!el) { setRect(null); return; }
+      const r = el.getBoundingClientRect();
+      setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+    }
+
+    // Scroll element into view first, then measure after scroll settles
+    const el = document.querySelector(selector);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Measure immediately and again after scroll animation
+      measure();
+      const t = setTimeout(measure, 400);
+      return () => clearTimeout(t);
+    }
+    measure();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selector, step]);
+
+  // Keep rect updated on scroll/resize
+  useEffect(() => {
+    function update() {
+      const el = document.querySelector(selector);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+    }
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [selector]);
+
+  return rect;
 }
 
 function TooltipBox({
@@ -54,100 +87,107 @@ function TooltipBox({
   onPrev,
   onSkip,
 }: {
-  step: TourStep;
+  step: (typeof STEPS)[0];
   index: number;
   total: number;
   onNext: () => void;
   onPrev: () => void;
   onSkip: () => void;
 }) {
-  const [rect, setRect] = useState<DOMRect | null>(null);
-  const [scrollY, setScrollY] = useState(0);
+  const rect = useElementRect(step.target, index);
+  const TOOLTIP_W = 300;
+  const GAP = 10;
 
-  useEffect(() => {
-    function update() {
-      setRect(getRect(step.target));
-      setScrollY(window.scrollY);
-    }
-    update();
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update);
-    };
-  }, [step.target]);
-
-  useEffect(() => {
-    const el = document.querySelector(step.target);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [step.target]);
-
-  const TOOLTIP_W = 280;
-  const TOOLTIP_H = 160;
-  const MARGIN = 12;
-
-  let top = 0;
-  let left = 0;
+  // All positions are viewport-relative (fixed positioning)
+  let tooltipTop = 0;
+  let tooltipLeft = 0;
 
   if (rect) {
-    const absTop = rect.top + scrollY;
-    const pos = step.position ?? "bottom";
-
-    if (pos === "bottom") {
-      top = absTop + rect.height + MARGIN;
-      left = rect.left + rect.width / 2 - TOOLTIP_W / 2;
-    } else if (pos === "top") {
-      top = absTop - TOOLTIP_H - MARGIN;
-      left = rect.left + rect.width / 2 - TOOLTIP_W / 2;
-    } else if (pos === "right") {
-      top = absTop + rect.height / 2 - TOOLTIP_H / 2;
-      left = rect.right + MARGIN;
+    if (step.position === "bottom") {
+      tooltipTop = rect.top + rect.height + GAP;
+      tooltipLeft = rect.left + rect.width / 2 - TOOLTIP_W / 2;
     } else {
-      top = absTop + rect.height / 2 - TOOLTIP_H / 2;
-      left = rect.left - TOOLTIP_W - MARGIN;
+      tooltipTop = rect.top - 180 - GAP;
+      tooltipLeft = rect.left + rect.width / 2 - TOOLTIP_W / 2;
     }
-
-    // Clamp to viewport width
-    left = Math.max(12, Math.min(left, window.innerWidth - TOOLTIP_W - 12));
+    // Clamp horizontally
+    tooltipLeft = Math.max(12, Math.min(tooltipLeft, window.innerWidth - TOOLTIP_W - 12));
+    // Clamp vertically — if it would go off bottom, flip to above
+    if (tooltipTop + 180 > window.innerHeight - 12) {
+      tooltipTop = rect.top - 180 - GAP;
+    }
+    if (tooltipTop < 12) tooltipTop = rect.top + rect.height + GAP;
   }
 
   const isLast = index === total - 1;
 
+  if (!rect) return null;
+
   return (
     <>
-      {/* Spotlight overlay */}
-      {rect && (
-        <div
-          className="fixed inset-0 z-40 pointer-events-none"
-          style={{
-            background: `radial-gradient(ellipse ${rect.width + 32}px ${rect.height + 32}px at ${rect.left + rect.width / 2}px ${rect.top + rect.height / 2}px, transparent 0%, rgba(0,0,0,0.55) 100%)`,
-          }}
-        />
-      )}
+      {/* Dark overlay with cutout around target */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          zIndex: 998,
+          background: `rgba(0,0,0,0.5)`,
+          // Use box-shadow to create spotlight cutout
+          boxShadow: `0 0 0 9999px rgba(0,0,0,0.5)`,
+          top: rect.top - 8,
+          left: rect.left - 8,
+          width: rect.width + 16,
+          height: rect.height + 16,
+          borderRadius: 16,
+          boxSizing: "content-box",
+          // Reset the spread so only outside is dark
+          outline: "9999px solid rgba(0,0,0,0.5)",
+          outlineOffset: "0px",
+        }}
+      />
+      {/* Invisible full-screen click-to-skip layer */}
+      <div
+        className="fixed inset-0 pointer-events-auto"
+        style={{ zIndex: 997 }}
+        onClick={onSkip}
+      />
 
       {/* Tooltip */}
       <div
-        className="absolute z-50 rounded-2xl px-5 py-4 flex flex-col gap-3"
+        className="fixed pointer-events-auto flex flex-col gap-3 rounded-2xl px-5 py-4"
         style={{
-          top,
-          left,
+          zIndex: 999,
+          top: tooltipTop,
+          left: tooltipLeft,
           width: TOOLTIP_W,
           background: "var(--cream)",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.22)",
           border: "1px solid var(--border)",
         }}
+        onClick={(e) => e.stopPropagation()}
       >
         <div>
           <div className="flex items-center justify-between mb-1">
-            <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--terracotta)" }}>
-              {index + 1} / {total}
-            </p>
-            <button onClick={onSkip} className="text-xs font-semibold" style={{ color: "var(--warm-brown)", opacity: 0.5 }}>
+            <div className="flex gap-1">
+              {Array.from({ length: total }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-1 rounded-full transition-all"
+                  style={{
+                    width: i === index ? 20 : 6,
+                    background: i === index ? "var(--terracotta)" : "var(--border)",
+                  }}
+                />
+              ))}
+            </div>
+            <button
+              onClick={onSkip}
+              className="text-xs font-semibold"
+              style={{ color: "var(--warm-brown)", opacity: 0.45 }}
+            >
               End tour
             </button>
           </div>
-          <p className="font-black text-base" style={{ color: "var(--chocolate)" }}>{step.title}</p>
+          <p className="font-black text-sm mt-2" style={{ color: "var(--chocolate)" }}>{step.title}</p>
           <p className="text-xs mt-1 leading-relaxed" style={{ color: "var(--warm-brown)" }}>{step.body}</p>
         </div>
 
@@ -185,17 +225,13 @@ export default function Tour({ onDone }: { onDone: () => void }) {
   const prev = useCallback(() => setStep((s) => Math.max(0, s - 1)), []);
 
   return (
-    <div className="fixed inset-0 z-40 pointer-events-none">
-      <div className="pointer-events-auto absolute inset-0" style={{ zIndex: 40 }}>
-        <TooltipBox
-          step={STEPS[step]}
-          index={step}
-          total={STEPS.length}
-          onNext={next}
-          onPrev={prev}
-          onSkip={onDone}
-        />
-      </div>
-    </div>
+    <TooltipBox
+      step={STEPS[step]}
+      index={step}
+      total={STEPS.length}
+      onNext={next}
+      onPrev={prev}
+      onSkip={onDone}
+    />
   );
 }

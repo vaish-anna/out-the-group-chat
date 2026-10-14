@@ -7,6 +7,25 @@ import { Trip, Member } from "@/types";
 import Avatar from "@/components/Avatar";
 import AppShell from "@/components/AppShell";
 import Link from "next/link";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+interface ChecklistItem {
+  id: string;
+  label: string;
+  done: boolean;
+}
+
+const DEFAULT_CHECKLIST: Omit<ChecklistItem, "done">[] = [
+  { id: "dates",       label: "Lock in the dates" },
+  { id: "budget",      label: "Set a group budget" },
+  { id: "flights",     label: "Check flights" },
+  { id: "accommodation", label: "Book accommodation" },
+  { id: "availability", label: "Collect everyone's availability" },
+  { id: "decisions",   label: "Make group decisions" },
+  { id: "itinerary",   label: "Build an itinerary" },
+  { id: "insurance",   label: "Sort travel insurance" },
+];
 
 export default function TripPage() {
   const { tripId } = useParams<{ tripId: string }>();
@@ -14,6 +33,28 @@ export default function TripPage() {
   const router = useRouter();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+
+  useEffect(() => {
+    if (!tripId) return;
+    const ref = doc(db, "trips", tripId, "meta", "checklist");
+    getDoc(ref).then((snap) => {
+      if (snap.exists()) {
+        setChecklist(snap.data().items ?? []);
+      } else {
+        const items = DEFAULT_CHECKLIST.map((i) => ({ ...i, done: false }));
+        setDoc(ref, { items });
+        setChecklist(items);
+      }
+    });
+  }, [tripId]);
+
+  async function toggleItem(id: string) {
+    if (!tripId) return;
+    const updated = checklist.map((i) => i.id === id ? { ...i, done: !i.done } : i);
+    setChecklist(updated);
+    await updateDoc(doc(db, "trips", tripId, "meta", "checklist"), { items: updated });
+  }
 
   useEffect(() => {
     if (!tripId) return;
@@ -116,6 +157,66 @@ export default function TripPage() {
           ))}
         </div>
       </div>
+
+      {/* Planning checklist */}
+      {checklist.length > 0 && (
+        <div
+          className="rounded-2xl px-5 py-5 mb-6"
+          style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--olive-dark)" }}>
+              Trip checklist
+            </p>
+            <span className="text-xs font-semibold" style={{ color: "var(--warm-brown)", opacity: 0.5 }}>
+              {checklist.filter((i) => i.done).length} / {checklist.length}
+            </span>
+          </div>
+          {/* Progress bar */}
+          <div className="h-1.5 rounded-full mb-4 overflow-hidden" style={{ background: "var(--surface-2)" }}>
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${(checklist.filter((i) => i.done).length / checklist.length) * 100}%`,
+                background: checklist.every((i) => i.done) ? "var(--olive-dark)" : "var(--terracotta)",
+              }}
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            {checklist.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => toggleItem(item.id)}
+                className="flex items-center gap-3 text-left transition-all active:scale-98"
+              >
+                <div
+                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
+                  style={{
+                    borderColor: item.done ? "var(--olive-dark)" : "var(--border)",
+                    background: item.done ? "var(--olive-dark)" : "transparent",
+                  }}
+                >
+                  {item.done && (
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  )}
+                </div>
+                <span
+                  className="text-sm font-semibold"
+                  style={{
+                    color: item.done ? "var(--warm-brown)" : "var(--chocolate)",
+                    textDecoration: item.done ? "line-through" : "none",
+                    opacity: item.done ? 0.5 : 1,
+                  }}
+                >
+                  {item.label}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex flex-col gap-3">

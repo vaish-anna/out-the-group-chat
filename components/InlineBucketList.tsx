@@ -1,23 +1,98 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { Destination } from "@/types";
-import { REGION_GRADIENT, DESTINATION_VIBE, searchLocalDestinations } from "@/data/destinations";
+import { REGION_GRADIENT, DESTINATION_VIBE, DESTINATION_PHOTO, searchLocalDestinations } from "@/data/destinations";
 import { nanoid } from "nanoid";
+import DestinationModal from "@/components/DestinationModal";
 
 interface Props {
   wishlist: Destination[];
   onSave: (updated: Destination[]) => Promise<void>;
+  onStartPlanning?: (d: Destination) => void;
+  onAddAvailability?: () => void;
 }
 
-export default function InlineBucketList({ wishlist, onSave }: Props) {
+function DestinationCard({
+  d,
+  onTap,
+  onRemove,
+}: {
+  d: Destination;
+  onTap: () => void;
+  onRemove: () => void;
+}) {
+  const photoId = DESTINATION_PHOTO[d.id];
+  const gradient = REGION_GRADIENT[d.region] ?? REGION_GRADIENT["Europe"];
+  const vibe = DESTINATION_VIBE[d.id];
+  const photoUrl = photoId
+    ? `https://images.unsplash.com/photo-${photoId}?w=400&q=75&auto=format&fit=crop`
+    : null;
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden cursor-pointer group"
+      style={{ border: "1px solid var(--border)" }}
+      onClick={onTap}
+    >
+      {/* Photo / gradient hero */}
+      <div
+        className="relative flex flex-col justify-end"
+        style={{
+          height: "110px",
+          background: photoUrl ? `url(${photoUrl}) center/cover` : gradient,
+        }}
+      >
+        <div
+          className="absolute inset-0"
+          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.05) 60%)" }}
+        />
+        {/* Remove button */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{ background: "rgba(0,0,0,0.4)" }}
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+        <div className="relative px-3 pb-2">
+          <p className="font-black text-white text-sm leading-tight">{d.name}</p>
+          <p className="text-[10px] font-semibold text-white" style={{ opacity: 0.75 }}>{d.country}</p>
+        </div>
+      </div>
+
+      {/* Card body */}
+      <div className="px-3 py-2.5" style={{ background: "var(--surface)" }}>
+        <div className="flex items-center justify-between gap-1">
+          {vibe ? (
+            <span className="text-[9px] font-bold uppercase tracking-wide truncate" style={{ color: "var(--terracotta)" }}>
+              {vibe}
+            </span>
+          ) : (
+            <span />
+          )}
+          <span
+            className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full shrink-0"
+            style={{ background: "var(--surface-2)", color: "var(--warm-brown)" }}
+          >
+            {d.region}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function InlineBucketList({ wishlist, onSave, onStartPlanning, onAddAvailability }: Props) {
   const [editing, setEditing] = useState(wishlist.length === 0);
   const [draft, setDraft] = useState<Destination[]>(wishlist);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Destination[]>([]);
   const [saving, setSaving] = useState(false);
+  const [activeDestination, setActiveDestination] = useState<Destination | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Sync when wishlist prop changes (Firestore update)
   useEffect(() => {
     if (!editing) setDraft(wishlist);
   }, [wishlist, editing]);
@@ -55,7 +130,6 @@ export default function InlineBucketList({ wishlist, onSave }: Props) {
   if (editing) {
     return (
       <div className="rounded-2xl overflow-hidden" style={{ border: "1px solid var(--border)", background: "var(--surface)" }}>
-        {/* Search */}
         <div className="px-4 pt-4 pb-3" style={{ borderBottom: "1px solid var(--border)" }}>
           <input
             ref={inputRef}
@@ -98,7 +172,6 @@ export default function InlineBucketList({ wishlist, onSave }: Props) {
           )}
         </div>
 
-        {/* Selected chips */}
         {draft.length > 0 && (
           <div className="px-4 py-3 flex flex-wrap gap-2" style={{ borderBottom: "1px solid var(--border)" }}>
             {draft.map((d) => (
@@ -115,7 +188,6 @@ export default function InlineBucketList({ wishlist, onSave }: Props) {
           </div>
         )}
 
-        {/* Actions */}
         <div className="flex gap-2 px-4 py-3">
           <button
             onClick={handleSave}
@@ -139,48 +211,22 @@ export default function InlineBucketList({ wishlist, onSave }: Props) {
     );
   }
 
-  // View mode
   return (
     <div>
       <div className="grid grid-cols-2 gap-3">
-        {wishlist.map((d) => {
-          const gradient = REGION_GRADIENT[d.region] ?? REGION_GRADIENT["Europe"];
-          const vibe = DESTINATION_VIBE[d.id];
-          return (
-            <div
-              key={d.id}
-              className="rounded-2xl overflow-hidden"
-              style={{ border: "1px solid var(--border)" }}
-            >
-              {/* Color header */}
-              <div
-                className="flex flex-col justify-end px-4 pt-4 pb-3"
-                style={{ background: gradient, minHeight: "70px" }}
-              >
-                <p className="font-black text-white text-base leading-tight" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.3)" }}>
-                  {d.name}
-                </p>
-                <p className="text-xs font-semibold text-white mt-0.5" style={{ opacity: 0.75 }}>
-                  {d.country}
-                </p>
-              </div>
-              {/* Card body */}
-              <div className="px-4 py-3" style={{ background: "var(--surface)" }}>
-                <div className="flex items-center justify-between">
-                  {vibe && (
-                    <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: "var(--terracotta)" }}>
-                      {vibe}
-                    </span>
-                  )}
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full ml-auto" style={{ background: "var(--surface-2)", color: "var(--warm-brown)" }}>
-                    {d.region}
-                  </span>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {wishlist.map((d) => (
+          <DestinationCard
+            key={d.id}
+            d={d}
+            onTap={() => setActiveDestination(d)}
+            onRemove={async () => {
+              const updated = wishlist.filter((w) => w.id !== d.id);
+              await onSave(updated);
+            }}
+          />
+        ))}
       </div>
+
       <button
         onClick={() => { setDraft(wishlist); setEditing(true); }}
         className="mt-3 w-full py-2.5 rounded-xl text-sm font-semibold transition-all"
@@ -188,6 +234,15 @@ export default function InlineBucketList({ wishlist, onSave }: Props) {
       >
         + Add destination
       </button>
+
+      {activeDestination && (
+        <DestinationModal
+          destination={activeDestination}
+          onClose={() => setActiveDestination(null)}
+          onStartPlanning={(d) => { onStartPlanning?.(d); setActiveDestination(null); }}
+          onAddAvailability={() => { onAddAvailability?.(); setActiveDestination(null); }}
+        />
+      )}
     </div>
   );
 }
