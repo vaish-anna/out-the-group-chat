@@ -18,6 +18,8 @@ import AppShell from "@/components/AppShell";
 import TravelTimeline from "@/components/TravelTimeline";
 import InlineBucketList from "@/components/InlineBucketList";
 import InlineAvailability from "@/components/InlineAvailability";
+import WelcomeModal from "@/components/WelcomeModal";
+import Tour from "@/components/Tour";
 import Link from "next/link";
 import { Trip } from "@/types";
 
@@ -31,10 +33,27 @@ export default function Dashboard() {
   const [editingAvailability, setEditingAvailability] = useState(false);
   const [showNewTripModal, setShowNewTripModal] = useState(false);
   const [newTripName, setNewTripName] = useState("");
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [showTour, setShowTour] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) router.replace("/login");
   }, [user, loading, router]);
+
+  useEffect(() => {
+    if (!user) return;
+    try {
+      if (!localStorage.getItem("otgc_welcome_seen")) {
+        setShowWelcome(true);
+      }
+    } catch {}
+  }, [user]);
+
+  useEffect(() => {
+    function handleReplayTour() { setShowTour(true); }
+    window.addEventListener("otgc:replay-tour", handleReplayTour);
+    return () => window.removeEventListener("otgc:replay-tour", handleReplayTour);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -46,6 +65,23 @@ export default function Dashboard() {
   }, [user]);
 
   const unread = notifications.filter((n) => !n.read);
+
+  function handleWelcomeDone() {
+    try { localStorage.setItem("otgc_welcome_seen", "1"); } catch {}
+    setShowWelcome(false);
+    try {
+      if (!localStorage.getItem("otgc_tour_seen")) setShowTour(true);
+    } catch {}
+  }
+
+  function handleTourDone() {
+    try { localStorage.setItem("otgc_tour_seen", "1"); } catch {}
+    setShowTour(false);
+  }
+
+  function replayTour() {
+    setShowTour(true);
+  }
 
   async function handleNewTrip() {
     if (!user || !newTripName.trim()) return;
@@ -122,11 +158,13 @@ export default function Dashboard() {
       </div>
 
       {/* Travel Timeline (always visible) */}
+      <div data-tour="timeline">
       <TravelTimeline
         plans={profile.travelPlans ?? []}
         onAdd={handleAddPlan}
         onRemove={handleRemovePlan}
       />
+      </div>
 
       {/* Overlap alerts */}
       {unread.length > 0 && (
@@ -168,7 +206,7 @@ export default function Dashboard() {
       )}
 
       {/* Bucket list */}
-      <section className="mb-8">
+      <section className="mb-8" data-tour="bucket-list">
         <div className="mb-4">
           <h2 className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--olive-dark)" }}>
             Your bucket list
@@ -178,7 +216,7 @@ export default function Dashboard() {
       </section>
 
       {/* Availability */}
-      <section className="mb-8">
+      <section className="mb-8" data-tour="availability">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--olive-dark)" }}>
             Your availability
@@ -215,7 +253,7 @@ export default function Dashboard() {
       </section>
 
       {/* Active trips */}
-      <section className="mb-8">
+      <section className="mb-8" data-tour="trips">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--olive-dark)" }}>
             Continue planning
@@ -273,7 +311,7 @@ export default function Dashboard() {
       </section>
 
       {/* Friends feed */}
-      <section>
+      <section data-tour="friends">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--olive-dark)" }}>
             Friends
@@ -327,6 +365,9 @@ export default function Dashboard() {
           </div>
         )}
       </section>
+
+      {showWelcome && <WelcomeModal onDone={handleWelcomeDone} />}
+      {showTour && <Tour onDone={handleTourDone} />}
 
       {/* New trip modal */}
       {showNewTripModal && (

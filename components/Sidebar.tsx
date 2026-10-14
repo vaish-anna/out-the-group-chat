@@ -112,6 +112,24 @@ export default function Sidebar() {
         })}
       </nav>
 
+      {/* Tour replay */}
+      <div className="px-4 pb-2">
+        <button
+          onClick={() => {
+            try { localStorage.removeItem("otgc_tour_seen"); } catch {}
+            window.dispatchEvent(new CustomEvent("otgc:replay-tour"));
+          }}
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
+          style={{ color: "rgba(245,240,232,0.4)" }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v4M12 16h.01" />
+          </svg>
+          Take a tour
+        </button>
+      </div>
+
       {/* User */}
       {user && (
         <div
