@@ -35,6 +35,7 @@ export interface UserProfile {
   phoneNumber: string;
   bio: string;
   wishlist: Destination[];
+  wishlistNotes?: Record<string, string[]>;
   availability: Availability;
   travelPlans: TravelPlan[];
   onboardingComplete: boolean;
@@ -67,7 +68,7 @@ export interface Trip {
   name: string;
   organizerId: string;
   organizerName: string;
-  status: "planning" | "decided" | "done" | "completed";
+  status: "planning" | "decided" | "done" | "completed" | "deleted";
   inviteCode: string;
   destination?: Destination;
   createdAt: number;
@@ -107,6 +108,7 @@ export interface ContentItem {
 export interface DecisionOption {
   id: string;
   label: string;
+  url?: string;
   thumbsUp: string[];
   thumbsDown: string[];
   isFinalized: boolean;

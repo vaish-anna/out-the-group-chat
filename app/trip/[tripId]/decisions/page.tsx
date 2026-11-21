@@ -41,13 +41,25 @@ function VoteBar({ option, uid, decisionId, tripId, isOrganizer, decisionFinaliz
         <p className="text-sm font-semibold truncate" style={{ color: option.isFinalized ? "white" : "var(--chocolate)" }}>
           {option.isFinalized ? "Decided: " : ""}{option.label}
         </p>
-        <div className="flex items-center gap-3 mt-0.5">
+        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
           <span className="text-xs font-semibold" style={{ color: option.isFinalized ? "rgba(255,255,255,0.65)" : "var(--olive-dark)" }}>
             {option.thumbsUp.length} up
           </span>
           <span className="text-xs font-semibold" style={{ color: option.isFinalized ? "rgba(255,255,255,0.45)" : "var(--warm-brown)", opacity: 0.65 }}>
             {option.thumbsDown.length} down
           </span>
+          {option.url && (
+            <a
+              href={option.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs font-semibold underline"
+              style={{ color: option.isFinalized ? "rgba(255,255,255,0.7)" : "var(--terracotta)" }}
+            >
+              View link
+            </a>
+          )}
         </div>
       </div>
 
@@ -95,6 +107,7 @@ function DecisionCard({ decision, uid, tripId, isOrganizer }: {
   decision: Decision; uid: string; tripId: string; isOrganizer: boolean;
 }) {
   const [newOption, setNewOption] = useState("");
+  const [newUrl, setNewUrl] = useState("");
   const [adding, setAdding] = useState(false);
   const isFinalized = !!decision.finalizedOptionId;
 
@@ -103,6 +116,7 @@ function DecisionCard({ decision, uid, tripId, isOrganizer }: {
     const option: DecisionOption = {
       id: nanoid(6),
       label: newOption.trim(),
+      url: newUrl.trim() || undefined,
       thumbsUp: [],
       thumbsDown: [],
       isFinalized: false,
@@ -114,7 +128,7 @@ function DecisionCard({ decision, uid, tripId, isOrganizer }: {
     if (snap.exists()) {
       await updateDoc(ref, { options: [...(snap.data().options ?? []), option] });
     }
-    setNewOption(""); setAdding(false);
+    setNewOption(""); setNewUrl(""); setAdding(false);
   }
 
   return (
@@ -154,19 +168,29 @@ function DecisionCard({ decision, uid, tripId, isOrganizer }: {
       {!isFinalized && (
         <div className="mt-3">
           {adding ? (
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2">
               <input
                 type="text"
-                placeholder="Add an option..."
+                placeholder="Option name (e.g. Old Town area, Hotel X)"
                 value={newOption}
                 onChange={(e) => setNewOption(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addOption()}
                 autoFocus
-                className="flex-1 px-3 py-2 rounded-xl text-sm outline-none border-2 transition-colors"
+                className="w-full px-3 py-2 rounded-xl text-sm outline-none border-2 transition-colors"
                 style={{ background: "var(--surface-2)", borderColor: newOption ? "var(--terracotta)" : "var(--border)", color: "var(--chocolate)" }}
               />
-              <button onClick={addOption} className="text-sm font-bold" style={{ color: "var(--terracotta)" }}>Add</button>
-              <button onClick={() => setAdding(false)} className="text-sm" style={{ color: "var(--warm-brown)", opacity: 0.5 }}>Cancel</button>
+              <input
+                type="url"
+                placeholder="Link (optional)"
+                value={newUrl}
+                onChange={(e) => setNewUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addOption()}
+                className="w-full px-3 py-2 rounded-xl text-sm outline-none border-2 transition-colors"
+                style={{ background: "var(--surface-2)", borderColor: newUrl ? "var(--terracotta)" : "var(--border)", color: "var(--chocolate)" }}
+              />
+              <div className="flex gap-2">
+                <button onClick={addOption} disabled={!newOption.trim()} className="text-sm font-bold disabled:opacity-40" style={{ color: "var(--terracotta)" }}>Add</button>
+                <button onClick={() => { setAdding(false); setNewOption(""); setNewUrl(""); }} className="text-sm" style={{ color: "var(--warm-brown)", opacity: 0.5 }}>Cancel</button>
+              </div>
             </div>
           ) : (
             <button

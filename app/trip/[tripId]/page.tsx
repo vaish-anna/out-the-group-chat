@@ -9,6 +9,7 @@ import AppShell from "@/components/AppShell";
 import Link from "next/link";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { deleteTrip } from "@/lib/trips";
 
 interface ChecklistItem {
   id: string;
@@ -17,15 +18,24 @@ interface ChecklistItem {
 }
 
 const DEFAULT_CHECKLIST: Omit<ChecklistItem, "done">[] = [
-  { id: "dates",       label: "Lock in the dates" },
-  { id: "budget",      label: "Set a group budget" },
-  { id: "flights",     label: "Check flights" },
+  { id: "dates",         label: "Lock in the dates" },
+  { id: "budget",        label: "Set a group budget" },
+  { id: "flights",       label: "Check flights" },
   { id: "accommodation", label: "Book accommodation" },
-  { id: "availability", label: "Collect everyone's availability" },
-  { id: "decisions",   label: "Make group decisions" },
-  { id: "itinerary",   label: "Build an itinerary" },
-  { id: "insurance",   label: "Sort travel insurance" },
+  { id: "decisions",     label: "Make group decisions" },
+  { id: "itinerary",     label: "Build an itinerary" },
+  { id: "packing",       label: "Build a packing list" },
 ];
+
+const CHECKLIST_HREFS: Record<string, string> = {
+  dates: "availability",
+  budget: "budget",
+  flights: "flights",
+  accommodation: "accommodation",
+  decisions: "decisions",
+  itinerary: "itinerary",
+  packing: "packing",
+};
 
 export default function TripPage() {
   const { tripId } = useParams<{ tripId: string }>();
@@ -34,6 +44,8 @@ export default function TripPage() {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!tripId) return;
@@ -48,6 +60,13 @@ export default function TripPage() {
       }
     });
   }, [tripId]);
+
+  async function handleDeleteTrip() {
+    if (!tripId) return;
+    setDeleting(true);
+    await deleteTrip(tripId);
+    router.replace("/dashboard");
+  }
 
   async function toggleItem(id: string) {
     if (!tripId) return;
@@ -86,11 +105,44 @@ export default function TripPage() {
         <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: "var(--terracotta)" }}>
           Trip
         </p>
-        <h1 className="text-3xl font-black" style={{ color: "var(--chocolate)" }}>{trip.name}</h1>
-        <p className="text-sm mt-1" style={{ color: "var(--warm-brown)", opacity: 0.6 }}>
-          Organized by {trip.organizerName}
-          {trip.destination ? ` · ${trip.destination.name}, ${trip.destination.country}` : ""}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-black" style={{ color: "var(--chocolate)" }}>{trip.name}</h1>
+            <p className="text-sm mt-1" style={{ color: "var(--warm-brown)", opacity: 0.6 }}>
+              Organized by {trip.organizerName}
+              {trip.destination ? ` · ${trip.destination.name}, ${trip.destination.country}` : ""}
+            </p>
+          </div>
+          {user?.uid === trip.organizerId && !confirmDelete && (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="mt-1 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all shrink-0"
+              style={{ color: "var(--warm-brown)", background: "var(--surface-2)", border: "1px solid var(--border)" }}
+            >
+              Delete trip
+            </button>
+          )}
+          {confirmDelete && (
+            <div className="flex items-center gap-2 shrink-0 mt-1">
+              <span className="text-xs" style={{ color: "var(--warm-brown)" }}>Sure?</span>
+              <button
+                onClick={handleDeleteTrip}
+                disabled={deleting}
+                className="text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-40"
+                style={{ background: "var(--terracotta)", color: "white" }}
+              >
+                {deleting ? "Deleting..." : "Yes, delete"}
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="text-xs font-semibold"
+                style={{ color: "var(--warm-brown)" }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Availability progress */}
@@ -183,37 +235,51 @@ export default function TripPage() {
             />
           </div>
           <div className="flex flex-col gap-2">
-            {checklist.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => toggleItem(item.id)}
-                className="flex items-center gap-3 text-left transition-all active:scale-98"
-              >
-                <div
-                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
-                  style={{
-                    borderColor: item.done ? "var(--olive-dark)" : "var(--border)",
-                    background: item.done ? "var(--olive-dark)" : "transparent",
-                  }}
-                >
-                  {item.done && (
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  )}
+            {checklist.map((item) => {
+              const href = CHECKLIST_HREFS[item.id];
+              return (
+                <div key={item.id} className="flex items-center gap-3">
+                  <button
+                    onClick={() => toggleItem(item.id)}
+                    className="flex-shrink-0 transition-all active:scale-90"
+                  >
+                    <div
+                      className="w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all"
+                      style={{
+                        borderColor: item.done ? "var(--olive-dark)" : "var(--border)",
+                        background: item.done ? "var(--olive-dark)" : "transparent",
+                      }}
+                    >
+                      {item.done && (
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </div>
+                  </button>
+                  <Link
+                    href={href ? `/trip/${tripId}/${href}` : "#"}
+                    className="flex-1 flex items-center justify-between group"
+                  >
+                    <span
+                      className="text-sm font-semibold"
+                      style={{
+                        color: item.done ? "var(--warm-brown)" : "var(--chocolate)",
+                        textDecoration: item.done ? "line-through" : "none",
+                        opacity: item.done ? 0.5 : 1,
+                      }}
+                    >
+                      {item.label}
+                    </span>
+                    {!item.done && href && (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--border)" }} className="group-hover:opacity-100 opacity-50 transition-opacity">
+                        <path d="M9 18l6-6-6-6" />
+                      </svg>
+                    )}
+                  </Link>
                 </div>
-                <span
-                  className="text-sm font-semibold"
-                  style={{
-                    color: item.done ? "var(--warm-brown)" : "var(--chocolate)",
-                    textDecoration: item.done ? "line-through" : "none",
-                    opacity: item.done ? 0.5 : 1,
-                  }}
-                >
-                  {item.label}
-                </span>
-              </button>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

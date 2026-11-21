@@ -1,7 +1,20 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Destination } from "@/types";
-import { REGION_GRADIENT, DESTINATION_VIBE, DESTINATION_PHOTO, searchLocalDestinations } from "@/data/destinations";
+import { Destination, Trip } from "@/types";
+import { REGION_GRADIENT, DESTINATION_PHOTO, DESTINATION_WEATHER, searchLocalDestinations } from "@/data/destinations";
+
+function getBestSeason(destId: string): string | null {
+  const w = DESTINATION_WEATHER[destId];
+  if (!w) return null;
+  const seasons = [
+    { key: "spring" as const, label: "Spring" },
+    { key: "summer" as const, label: "Summer" },
+    { key: "fall" as const, label: "Fall" },
+    { key: "winter" as const, label: "Winter" },
+  ];
+  const best = seasons.reduce((acc, s) => w[s.key] > w[acc.key] ? s : acc, seasons[0]);
+  return w[best.key] >= 3 ? best.label : null;
+}
 import { nanoid } from "nanoid";
 import DestinationModal from "@/components/DestinationModal";
 
@@ -10,20 +23,23 @@ interface Props {
   onSave: (updated: Destination[]) => Promise<void>;
   onStartPlanning?: (d: Destination) => void;
   onAddAvailability?: () => void;
+  userTrips?: Trip[];
 }
 
 function DestinationCard({
   d,
   onTap,
   onRemove,
+  isPlanning,
 }: {
   d: Destination;
   onTap: () => void;
   onRemove: () => void;
+  isPlanning: boolean;
 }) {
   const photoId = DESTINATION_PHOTO[d.id];
   const gradient = REGION_GRADIENT[d.region] ?? REGION_GRADIENT["Europe"];
-  const vibe = DESTINATION_VIBE[d.id];
+  const bestSeason = getBestSeason(d.id);
   const photoUrl = photoId
     ? `https://images.unsplash.com/photo-${photoId}?w=400&q=75&auto=format&fit=crop`
     : null;
@@ -56,6 +72,13 @@ function DestinationCard({
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>
         </button>
+        {/* Planning badge */}
+        {isPlanning && (
+          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide"
+            style={{ background: "var(--terracotta)", color: "white" }}>
+            Planning
+          </div>
+        )}
         <div className="relative px-3 pb-2">
           <p className="font-black text-white text-sm leading-tight">{d.name}</p>
           <p className="text-[10px] font-semibold text-white" style={{ opacity: 0.75 }}>{d.country}</p>
@@ -65,9 +88,9 @@ function DestinationCard({
       {/* Card body */}
       <div className="px-3 py-2.5" style={{ background: "var(--surface)" }}>
         <div className="flex items-center justify-between gap-1">
-          {vibe ? (
-            <span className="text-[9px] font-bold uppercase tracking-wide truncate" style={{ color: "var(--terracotta)" }}>
-              {vibe}
+          {bestSeason ? (
+            <span className="text-[9px] font-bold uppercase tracking-wide" style={{ color: "var(--olive-dark)" }}>
+              Best: {bestSeason}
             </span>
           ) : (
             <span />
@@ -84,7 +107,8 @@ function DestinationCard({
   );
 }
 
-export default function InlineBucketList({ wishlist, onSave, onStartPlanning, onAddAvailability }: Props) {
+export default function InlineBucketList({ wishlist, onSave, onStartPlanning, onAddAvailability, userTrips = [] }: Props) {
+  const planningDestIds = new Set(userTrips.map((t) => t.destination?.id).filter(Boolean) as string[]);
   const [editing, setEditing] = useState(wishlist.length === 0);
   const [draft, setDraft] = useState<Destination[]>(wishlist);
   const [query, setQuery] = useState("");
@@ -218,6 +242,7 @@ export default function InlineBucketList({ wishlist, onSave, onStartPlanning, on
           <DestinationCard
             key={d.id}
             d={d}
+            isPlanning={planningDestIds.has(d.id)}
             onTap={() => setActiveDestination(d)}
             onRemove={async () => {
               const updated = wishlist.filter((w) => w.id !== d.id);

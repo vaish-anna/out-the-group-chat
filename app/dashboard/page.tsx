@@ -215,6 +215,7 @@ export default function Dashboard() {
         <InlineBucketList
           wishlist={profile.wishlist}
           onSave={handleSaveWishlist}
+          userTrips={trips}
           onStartPlanning={(d) => {
             setNewTripName(d.name + " trip");
             setShowNewTripModal(true);

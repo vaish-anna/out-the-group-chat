@@ -170,11 +170,32 @@ export function subscribeToUserTrips(uid: string, cb: (trips: Trip[]) => void) {
     (snap) => {
       const trips = snap.docs
         .map((d) => d.data() as Trip)
-        .filter((t) => t.status !== "done" && t.status !== "completed")
+        .filter((t) => t.status !== "done" && t.status !== "completed" && t.status !== "deleted")
         .sort((a, b) => b.createdAt - a.createdAt);
       cb(trips);
     }
   );
+}
+
+export async function deleteTrip(tripId: string) {
+  await updateDoc(doc(db, "trips", tripId), { status: "deleted" });
+}
+
+export interface TripBudget {
+  uid: string;
+  displayName: string;
+  maxBudget: number;
+  updatedAt: number;
+}
+
+export async function submitBudget(tripId: string, budget: TripBudget) {
+  await setDoc(doc(db, "trips", tripId, "budgets", budget.uid), budget);
+}
+
+export function subscribeToBudgets(tripId: string, cb: (budgets: TripBudget[]) => void) {
+  return onSnapshot(collection(db, "trips", tripId, "budgets"), (snap) => {
+    cb(snap.docs.map((d) => d.data() as TripBudget));
+  });
 }
 
 export function subscribeToDecisions(

@@ -1,12 +1,15 @@
 "use client";
+import { useState, useEffect } from "react";
 import { Destination } from "@/types";
 import {
   REGION_GRADIENT,
-  DESTINATION_VIBE,
   DESTINATION_PHOTO,
   DESTINATION_WEATHER,
   DESTINATION_HIGHLIGHTS,
 } from "@/data/destinations";
+import { useAuth } from "@/hooks/useAuth";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 const SEASON_LABELS = ["Spring", "Summer", "Fall", "Winter"] as const;
 type SeasonKey = "spring" | "summer" | "fall" | "winter";
@@ -35,15 +38,48 @@ export default function DestinationModal({
   onStartPlanning: (d: Destination) => void;
   onAddAvailability: () => void;
 }) {
+  const { user } = useAuth();
   const photoId = DESTINATION_PHOTO[destination.id];
   const gradient = REGION_GRADIENT[destination.region] ?? REGION_GRADIENT["Europe"];
-  const vibe = DESTINATION_VIBE[destination.id];
   const weather = DESTINATION_WEATHER[destination.id];
   const highlights = DESTINATION_HIGHLIGHTS[destination.id];
+
+  const [userNotes, setUserNotes] = useState<string[]>([]);
+  const [newNote, setNewNote] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
 
   const photoUrl = photoId
     ? `https://images.unsplash.com/photo-${photoId}?w=800&q=75&auto=format&fit=crop`
     : null;
+
+  useEffect(() => {
+    if (!user) return;
+    getDoc(doc(db, "users", user.uid)).then((snap) => {
+      const notes = snap.data()?.wishlistNotes?.[destination.id] ?? [];
+      setUserNotes(notes);
+    });
+  }, [user, destination.id]);
+
+  async function addNote() {
+    if (!user || !newNote.trim() || savingNote) return;
+    setSavingNote(true);
+    const updated = [...userNotes, newNote.trim()];
+    setUserNotes(updated);
+    setNewNote("");
+    await updateDoc(doc(db, "users", user.uid), {
+      [`wishlistNotes.${destination.id}`]: updated,
+    });
+    setSavingNote(false);
+  }
+
+  async function removeNote(index: number) {
+    if (!user) return;
+    const updated = userNotes.filter((_, i) => i !== index);
+    setUserNotes(updated);
+    await updateDoc(doc(db, "users", user.uid), {
+      [`wishlistNotes.${destination.id}`]: updated,
+    });
+  }
 
   return (
     <div
@@ -80,7 +116,6 @@ export default function DestinationModal({
             <h2 className="text-2xl font-black text-white leading-tight">{destination.name}</h2>
             <p className="text-sm text-white mt-0.5" style={{ opacity: 0.8 }}>
               {destination.country}
-              {vibe ? ` · ${vibe}` : ""}
             </p>
           </div>
         </div>
@@ -101,20 +136,6 @@ export default function DestinationModal({
               style={{ background: "var(--surface)", color: "var(--chocolate)", border: "1px solid var(--border)" }}
             >
               Add availability
-            </button>
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.origin + "/profile/me");
-              }}
-              className="px-4 py-3 rounded-2xl font-bold text-sm"
-              style={{ background: "var(--surface)", color: "var(--chocolate)", border: "1px solid var(--border)" }}
-              title="Share your profile"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8" />
-                <polyline points="16 6 12 2 8 6" />
-                <line x1="12" y1="2" x2="12" y2="15" />
-              </svg>
             </button>
           </div>
 
@@ -143,37 +164,82 @@ export default function DestinationModal({
             </div>
           )}
 
-          {/* Highlights */}
-          {highlights && (
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "var(--olive-dark)" }}>
-                Things to see & do
-              </p>
-              <div className="flex flex-col gap-2">
-                {highlights.map((h, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 rounded-xl px-4 py-3"
-                    style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+          {/* Things to see & do */}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "var(--olive-dark)" }}>
+              Things to see & do
+            </p>
+            <div className="flex flex-col gap-2">
+              {highlights?.map((h, i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-3 rounded-xl px-4 py-3"
+                  style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
+                >
+                  <span
+                    className="text-xs font-black w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ background: "var(--terracotta)", color: "white" }}
                   >
-                    <span
-                      className="text-xs font-black w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ background: "var(--terracotta)", color: "white" }}
-                    >
-                      {i + 1}
-                    </span>
-                    <p className="text-sm font-semibold" style={{ color: "var(--chocolate)" }}>{h}</p>
-                  </div>
-                ))}
+                    {i + 1}
+                  </span>
+                  <p className="text-sm font-semibold" style={{ color: "var(--chocolate)" }}>{h}</p>
+                </div>
+              ))}
+
+              {/* User's personal excited-about notes */}
+              {userNotes.map((note, i) => (
+                <div
+                  key={`user-${i}`}
+                  className="flex items-center gap-3 rounded-xl px-4 py-3 group"
+                  style={{ background: "var(--surface-2)", border: "1px dashed var(--border)" }}
+                >
+                  <span
+                    className="text-xs font-black w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                    style={{ background: "var(--olive)", color: "white" }}
+                  >
+                    {(highlights?.length ?? 0) + i + 1}
+                  </span>
+                  <p className="text-sm font-semibold flex-1" style={{ color: "var(--chocolate)" }}>{note}</p>
+                  <button
+                    onClick={() => removeNote(i)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ color: "var(--warm-brown)" }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+
+              {/* Add note input */}
+              <div className="flex gap-2 mt-1">
+                <input
+                  type="text"
+                  placeholder="What are you most excited for?"
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addNote()}
+                  className="flex-1 px-3 py-2.5 rounded-xl text-sm outline-none border-2 transition-colors"
+                  style={{
+                    background: "var(--surface-2)",
+                    borderColor: newNote ? "var(--terracotta)" : "var(--border)",
+                    color: "var(--chocolate)",
+                  }}
+                />
+                {newNote.trim() && (
+                  <button
+                    onClick={addNote}
+                    disabled={savingNote}
+                    className="px-4 py-2.5 rounded-xl font-bold text-sm transition-all active:scale-95 disabled:opacity-40"
+                    style={{ background: "var(--terracotta)", color: "white" }}
+                  >
+                    Add
+                  </button>
+                )}
               </div>
             </div>
-          )}
-
-          {!weather && !highlights && (
-            <div className="py-4 text-center" style={{ color: "var(--warm-brown)", opacity: 0.4 }}>
-              <p className="text-sm">More details coming soon.</p>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
